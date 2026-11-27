@@ -4,10 +4,10 @@ All notable changes to this project. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions
 follow [Semantic Versioning](https://semver.org/).
 
-## [1.2.0] - 2026-11-27
+## [1.1.1] - 2026-11-27
 
 The first release that reaches 1.1.0 through the update button: press
-**Update to 1.2.0** in the top bar instead of downloading it by hand.
+**Update to 1.1.1** in the top bar instead of downloading it by hand.
 
 ### Fixed
 
@@ -84,6 +84,6 @@ First release.
   including two-key sequences.
 - 127 settings in 20 sections, with search, import, export and reset.
 
-[1.2.0]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.2.0
+[1.1.1]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.1.1
 [1.1.0]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.1.0
 [1.0.0]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.0.0
