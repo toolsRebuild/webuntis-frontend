@@ -4,6 +4,23 @@ All notable changes to this project. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions
 follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-11-27
+
+The first release that reaches 1.1.0 through the update button: press
+**Update to 1.2.0** in the top bar instead of downloading it by hand.
+
+### Fixed
+
+- Changes found while no window was open are no longer lost. The backend
+  keeps the last 50 change events, and a window that reconnects (the web
+  edition's tab reopened, the app waking from sleep, the first refresh
+  racing the page at startup) receives the ones it missed.
+- Quiet hours work across midnight (22:00 to 6:30) and accept times like
+  `22`, `22.00` or `6:30`. The fields save the time as HH:MM and mark
+  input that is not a time instead of saving it.
+- Timetable: an invalid `?date=` in the address (a typo in a bookmark) no
+  longer freezes the app; the view falls back to today.
+
 ## [1.1.0] - 2026-11-13
 
 The app can now update itself. Version 1.0.0 has no updater, so this
@@ -67,5 +84,6 @@ First release.
   including two-key sequences.
 - 127 settings in 20 sections, with search, import, export and reset.
 
+[1.2.0]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.2.0
 [1.1.0]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.1.0
 [1.0.0]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.0.0
