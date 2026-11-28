@@ -71,9 +71,10 @@ func RemoveLeftovers(in Install) {
 	var targets []string
 	switch in.Kind {
 	case KindWeb:
-		targets = []string{in.Exe}
+		targets = []string{in.Exe, filepath.Join(filepath.Dir(in.Exe), cliName(in.OS))}
 	case KindPortable:
-		targets = []string{in.Exe, filepath.Join(filepath.Dir(in.Exe), shellName(in.OS))}
+		targets = []string{in.Exe, filepath.Join(filepath.Dir(in.Exe), shellName(in.OS)),
+			filepath.Join(filepath.Dir(in.Exe), cliName(in.OS))}
 	case KindAppImage:
 		targets = []string{in.AppImage}
 	}
@@ -102,6 +103,14 @@ func shellName(goos string) string {
 	return "untis-desktop"
 }
 
+// cliName is the untis CLI the releases ship next to untisd.
+func cliName(goos string) string {
+	if goos == "windows" {
+		return "untis.exe"
+	}
+	return "untis"
+}
+
 func backendName(goos string) string {
 	if goos == "windows" {
 		return "untisd.exe"
@@ -123,8 +132,10 @@ func newTemp(dir string) (*os.File, error) {
 // extract unpacks the programs named in wanted (archive base name ->
 // target path) from a release archive into temporary files next to their
 // targets. Everything else in the archive is ignored, and an archive that
-// lacks one of them is rejected.
-func extract(archive string, zipped bool, wanted map[string]string) (out []placement, err error) {
+// lacks one of them is rejected. Programs in optional are taken the same
+// way when the archive has them (the untis CLI, which releases before
+// 1.2.0 did not ship).
+func extract(archive string, zipped bool, wanted, optional map[string]string) (out []placement, err error) {
 	defer func() {
 		if err != nil {
 			for _, p := range out {
@@ -136,6 +147,9 @@ func extract(archive string, zipped bool, wanted map[string]string) (out []place
 	found := map[string]bool{}
 	save := func(name string, r io.Reader) error {
 		target, ok := wanted[path.Base(name)]
+		if !ok {
+			target, ok = optional[path.Base(name)]
+		}
 		if !ok || found[path.Base(name)] {
 			return nil
 		}

@@ -8,9 +8,11 @@ comes in two editions:
   in your browser. It runs on everything Go supports, including the BSDs.
 
 Both start with fictional **sample data**. To see your real timetable,
-install the [`untis` CLI](https://github.com/seesee010/webuntis-scraper),
-run `untis init` once, and switch **Settings › Data source** to
-**untis CLI**.
+run `untis init` once and switch **Settings › Data source** to
+**untis CLI**. Since 1.2.0 every release ships the
+[`untis` CLI](https://github.com/toolsRebuild/webuntis-scraper) next to the
+app, so nothing else has to be installed; see
+[The bundled untis CLI](#the-bundled-untis-cli) for where it is.
 
 In the file names below, `VERSION` stands for the release version, e.g. `1.0.0`.
 
@@ -84,6 +86,31 @@ cd untis-web-VERSION-freebsd-amd64
 macOS). On a machine without a desktop, add `-no-browser` and open the
 printed address in a browser on the same machine — the server only
 accepts connections from the local machine.
+
+## The bundled untis CLI
+
+The app runs the `untis` program that sits next to its backend (`untisd`).
+Its version is pinned in [`UNTIS_CLI_VERSION`](../UNTIS_CLI_VERSION) and
+listed in the release notes; it is the Go version of the CLI, which logs in
+over plain HTTP (accounts that need the browser login, i.e. 2FA or SSO,
+need the Python version of the CLI and its path in **Settings › Data
+source › Executable**).
+
+Run `untis init` with that program once, in a terminal:
+
+| Installation | `untis` is at |
+|---|---|
+| `.deb` / `.rpm` | `/usr/bin/untis` (already in your `PATH`) |
+| Windows installer | the installation folder, next to `untis-desktop.exe` |
+| macOS | `/Applications/Untis.app/Contents/MacOS/untis` |
+| portable zip/tar.gz, web edition | the unpacked folder, next to `untisd` |
+| AppImage | inside the image; use any other `untis`, e.g. the [standalone download](https://github.com/toolsRebuild/webuntis-scraper/releases/latest) |
+
+`untis init` writes `~/.config/untis/config.json` and `.env`, which every
+`untis` uses, so it does not matter which copy sets it up. A path set in
+**Executable** always wins; with the default `untis` the bundled program
+is preferred over one in your `PATH`. The update button replaces it
+together with the app.
 
 ## Updating
 

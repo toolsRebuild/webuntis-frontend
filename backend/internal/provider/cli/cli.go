@@ -1,5 +1,5 @@
 // Package cli implements a provider that drives the installed untis CLI
-// (https://github.com/seesee010/webuntis-scraper). The GUI never talks to
+// (https://github.com/toolsRebuild/webuntis-scraper). The GUI never talks to
 // WebUntis itself: login, session handling, caching and the API calls
 // all stay in the CLI.
 package cli
@@ -62,9 +62,7 @@ func New(cfg Config, run Runner) *Provider {
 	if run == nil {
 		run = ExecRunner{Env: []string{"NO_COLOR=1"}}
 	}
-	if cfg.Binary == "" {
-		cfg.Binary = "untis"
-	}
+	cfg.Binary = Resolve(cfg.Binary)
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 2 * time.Minute
 	}
@@ -145,7 +143,7 @@ func (p *Provider) exec(ctx context.Context, args []string) (Result, error) {
 		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
 			return res, &provider.Error{
 				Kind: provider.KindConfig,
-				Msg:  "untis CLI not found (" + p.cfg.Binary + "); install it with: pipx install git+https://github.com/seesee010/webuntis-scraper",
+				Msg:  "untis CLI not found (" + p.cfg.Binary + "); the app ships it next to untisd, or download it from https://github.com/toolsRebuild/webuntis-scraper/releases",
 				Err:  err,
 			}
 		}

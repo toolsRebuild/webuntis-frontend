@@ -169,7 +169,7 @@ func TestExtractTakesOnlyTheNamedPrograms(t *testing.T) {
 	}), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	files, err := extract(archive, false, map[string]string{"untisd": target})
+	files, err := extract(archive, false, map[string]string{"untisd": target}, nil)
 	if err != nil || len(files) != 1 || files[0].target != target {
 		t.Fatalf("files = %+v, err = %v", files, err)
 	}
@@ -192,7 +192,7 @@ func TestExtractCleansUpWhenAProgramIsMissing(t *testing.T) {
 	}
 	_, err := extract(archive, true, map[string]string{
 		"untisd.exe": filepath.Join(dir, "untisd.exe"), "untis-desktop.exe": filepath.Join(dir, "untis-desktop.exe"),
-	})
+	}, nil)
 	if err == nil || !strings.Contains(err.Error(), "untis-desktop.exe") {
 		t.Errorf("err = %v", err)
 	}

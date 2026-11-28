@@ -629,6 +629,31 @@ func TestPortableFolderIsReplaced(t *testing.T) {
 	}
 }
 
+func TestBundledCLIIsReplacedToo(t *testing.T) {
+	dir := t.TempDir()
+	asset := "Untis_1.2.0_x64-linux-portable.tar.gz"
+	in := Install{Kind: KindPortable, OS: "linux", Arch: "amd64", Exe: write(t, filepath.Join(dir, "untisd"), "old backend")}
+	shell := write(t, filepath.Join(dir, "untis-desktop"), "old app")
+	cli := write(t, filepath.Join(dir, "untis"), "old cli")
+	gh := newFakeGitHub(t, "v1.2.0", withSums(map[string][]byte{
+		asset: tarGz(t, map[string]string{
+			"Untis_1.2.0_x64-linux-portable/untisd":        "new backend",
+			"Untis_1.2.0_x64-linux-portable/untis-desktop": "new app",
+			"Untis_1.2.0_x64-linux-portable/untis":         "new cli",
+		}),
+	}))
+	h := newHarness(t, "1.1.1", in, gh, nil)
+	if st := h.Check(context.Background()); st.Asset != asset {
+		t.Fatalf("asset = %s", st.Asset)
+	}
+	if st := h.finish(t); st.State != StateDone {
+		t.Fatalf("status = %+v", st)
+	}
+	if read(t, in.Exe) != "new backend" || read(t, shell) != "new app" || read(t, cli) != "new cli" {
+		t.Errorf("programs = %q, %q, %q", read(t, in.Exe), read(t, shell), read(t, cli))
+	}
+}
+
 func TestAppImageIsReplaced(t *testing.T) {
 	dir := t.TempDir()
 	image := write(t, filepath.Join(dir, "Untis.AppImage"), "old image")

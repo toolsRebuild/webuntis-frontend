@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Release helpers. Run from anywhere; paths are relative to the repo.
 #
-#   release.sh sidecar TRIPLE     build untisd as Tauri sidecar for a Rust target triple
+#   release.sh sidecar TRIPLE     build untisd and fetch untis as Tauri sidecars for a Rust target triple
+#   release.sh cli-sidecar TRIPLE fetch only the untis sidecar (make sidecar)
+#   release.sh cli GOOS GOARCH GOARM OUT   fetch the pinned untis CLI for one platform to OUT ("" for no GOARM)
 #   release.sh goarch TRIPLE      print "GOOS GOARCH [GOARM]" for a triple (used by tests)
 #   release.sh web GOOS GOARCH    pack the web edition for one platform into release/
 #   release.sh web-all            pack the web edition for every platform in WEB_TARGETS
@@ -11,6 +13,12 @@
 #
 # The web edition embeds the frontend: run `make web` (or copy desktop/dist
 # into backend/internal/webui/dist) before `web`/`web-all`.
+#
+# Every release ships the untis CLI next to untisd. Its version is pinned in
+# UNTIS_CLI_VERSION; the archives come from the webuntis-scraper release of
+# that version and are checked against its SHA256SUMS. UNTIS_CLI_DIR points
+# to a folder with those archives and SHA256SUMS instead (offline builds,
+# tests); downloads are kept in .cache/untis-cli/VERSION.
 set -euo pipefail
 export LC_ALL=C
 
@@ -18,6 +26,8 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 VERSION=$(cat "$ROOT/VERSION")
 OUT=$ROOT/release
 LDFLAGS="-s -w -X main.version=$VERSION"
+CLI_VERSION=$(tr -d '[:space:]' <"$ROOT/UNTIS_CLI_VERSION")
+CLI_REPO=https://github.com/toolsRebuild/webuntis-scraper
 
 # Every platform the web edition is built for: GOOS/GOARCH[/GOARM].
 WEB_TARGETS=(
@@ -76,6 +86,78 @@ release. Without this file the button opens the release page instead.
 TXT
 }
 
+# sha256 FILE -> hex digest (sha256sum on Linux/Windows, shasum on macOS)
+sha256() {
+  if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1
+  else shasum -a 256 "$1" | cut -d' ' -f1; fi
+}
+
+unzipfile() { # unzipfile ARCHIVE DIR
+  if command -v unzip >/dev/null; then
+    unzip -q "$1" -d "$2"
+  elif command -v 7z >/dev/null; then
+    7z x -bd -y -o"$2" "$1" >/dev/null
+  else
+    powershell -NoProfile -Command "Expand-Archive -Path '$(cygpath -w "$1")' -DestinationPath '$(cygpath -w "$2")'"
+  fi
+}
+
+# cli_archive FILE: path of a verified untis release archive, downloaded
+# (or taken from UNTIS_CLI_DIR) on first use.
+cli_archive() {
+  local file=$1 dir want got
+  [[ $CLI_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "UNTIS_CLI_VERSION is not a version: '$CLI_VERSION'"
+  if [[ -n ${UNTIS_CLI_DIR:-} ]]; then
+    dir=$UNTIS_CLI_DIR
+  else
+    dir=$ROOT/.cache/untis-cli/$CLI_VERSION
+    mkdir -p "$dir"
+    local url=$CLI_REPO/releases/download/v$CLI_VERSION
+    [[ -s $dir/SHA256SUMS ]] || curl -fsSL --retry 3 -o "$dir/SHA256SUMS" "$url/SHA256SUMS" \
+      || die "cannot download SHA256SUMS of untis $CLI_VERSION ($url)"
+    [[ -s $dir/$file ]] || curl -fsSL --retry 3 -o "$dir/$file" "$url/$file" \
+      || die "cannot download $file of untis $CLI_VERSION ($url)"
+  fi
+  [[ -f $dir/$file ]] || die "$file missing in $dir"
+  want=$(awk -v f="$file" '$2 == f || $2 == "*" f { print tolower($1) }' "$dir/SHA256SUMS")
+  [[ -n $want ]] || die "$file is not listed in $dir/SHA256SUMS"
+  got=$(sha256 "$dir/$file")
+  [[ $got == "$want" ]] || die "checksum mismatch for $file (expected $want, got $got)"
+  echo "$dir/$file"
+}
+
+# cli GOOS GOARCH GOARM OUT: the pinned untis binary for one platform.
+cli() {
+  local goos=$1 goarch=$2 goarm=$3 out=$4
+  local suffix=$goarch${goarm:+v$goarm} ext=tar.gz bin=untis
+  if [[ $goos == windows ]]; then ext=zip; bin=untis.exe; fi
+  local name=untis-$CLI_VERSION-$goos-$suffix archive stage
+  archive=$(cli_archive "$name.$ext")
+  stage=$(mktemp -d)
+  if [[ $ext == zip ]]; then unzipfile "$archive" "$stage"; else tar -xzf "$archive" -C "$stage"; fi
+  [[ -f $stage/$name/$bin ]] || { rm -rf "$stage"; die "$name.$ext has no $name/$bin"; }
+  mkdir -p "$(dirname "$out")"
+  mv "$stage/$name/$bin" "$out"
+  chmod 755 "$out"
+  rm -rf "$stage"
+}
+
+cli_sidecar() {
+  local triple=$1 dir=$ROOT/desktop/src-tauri/binaries
+  local ext="" goos goarch goarm
+  read -r goos goarch goarm <<<"$(goarch "$triple")"
+  [[ $goos == windows ]] && ext=.exe
+  local out=$dir/untis-$triple$ext
+  if [[ $goarch == universal ]]; then
+    cli darwin amd64 "" "$dir/untis-x86_64-apple-darwin"
+    cli darwin arm64 "" "$dir/untis-aarch64-apple-darwin"
+    lipo -create -output "$out" "$dir/untis-x86_64-apple-darwin" "$dir/untis-aarch64-apple-darwin"
+  else
+    cli "$goos" "$goarch" "$goarm" "$out"
+  fi
+  echo "$out"
+}
+
 sidecar() {
   local triple=$1 dir=$ROOT/desktop/src-tauri/binaries
   local ext="" goos goarch goarm
@@ -93,6 +175,7 @@ sidecar() {
     build "$out" "$goos" "$goarch" "$goarm"
   fi
   echo "$out"
+  cli_sidecar "$triple"
 }
 
 web() {
@@ -103,8 +186,9 @@ web() {
   local stage
   stage=$(mktemp -d)
   mkdir -p "$stage/$name" "$OUT"
-  local bin=untisd
-  [[ $goos == windows ]] && bin=untisd.exe
+  local bin=untisd clibin=untis
+  if [[ $goos == windows ]]; then bin=untisd.exe; clibin=untis.exe; fi
+  cli "$goos" "$goarch" "$goarm" "$stage/$name/$clibin"
   # The binary knows which archive it came from, so its update button
   # fetches the same one of the newer release.
   EXTRA_LDFLAGS="-X main.webTarget=$goos-$suffix" build "$stage/$name/$bin" "$goos" "$goarch" "$goarm"
@@ -117,7 +201,9 @@ Without a browser opener (e.g. on a server), add -no-browser and open the
 printed address yourself.
 
 Sample data is shown until you switch Settings > Data source to the
-untis CLI (https://github.com/seesee010/webuntis-scraper).
+untis CLI. It comes with this archive ($clibin, version $CLI_VERSION,
+https://github.com/toolsRebuild/webuntis-scraper): set it up once with
+./$clibin init, the app then uses it automatically.
 TXT
   if [[ $goos == windows ]]; then
     (cd "$stage" && zip -qr "$OUT/$name.zip" "$name")
@@ -178,14 +264,14 @@ collect() {
     linux)
       name=Untis_${VERSION}_${arch}-linux-portable
       mkdir -p "$stage/$name"
-      cp "$rel/untis-desktop" "$rel/untisd" "$stage/$name/"
+      cp "$rel/untis-desktop" "$rel/untisd" "$rel/untis" "$stage/$name/"
       portable_marker "$stage/$name"
       tar -C "$stage" -czf "$OUT/$name.tar.gz" "$name"
       n=$((n + 1)) ;;
     windows)
       name=Untis_${VERSION}_${arch}-windows-portable
       mkdir -p "$stage/$name"
-      cp "$rel/untis-desktop.exe" "$rel/untisd.exe" "$stage/$name/"
+      cp "$rel/untis-desktop.exe" "$rel/untisd.exe" "$rel/untis.exe" "$stage/$name/"
       portable_marker "$stage/$name"
       zipdir "$OUT/$name.zip" "$stage/$name"
       n=$((n + 1)) ;;
@@ -222,6 +308,8 @@ checksums() {
 
 case ${1:-} in
   sidecar) sidecar "${2:?triple}" ;;
+  cli-sidecar) cli_sidecar "${2:?triple}" ;;
+  cli) cli "${2:?goos}" "${3:?goarch}" "${4:-}" "${5:?output file}" ;;
   goarch) goarch "${2:?triple}" ;;
   web) web "${2:?goos}" "${3:?goarch}" "${4:-}" ;;
   web-all) web_all ;;
@@ -229,5 +317,5 @@ case ${1:-} in
   collect) collect "${2:?triple}" ;;
   notes) notes "${2:?version}" ;;
   checksums) checksums ;;
-  *) sed -n '2,13p' "$0"; exit 2 ;;
+  *) sed -n '2,22p' "$0"; exit 2 ;;
 esac

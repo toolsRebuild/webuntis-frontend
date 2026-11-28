@@ -414,6 +414,8 @@ func (u *Updater) install(ctx context.Context, rel *Release, asset string, actio
 	switch action {
 	case ActionReplace:
 		var files []placement
+		// The bundled untis CLI is replaced together with the app.
+		cli := map[string]string{cliName(in.OS): filepath.Join(filepath.Dir(in.Exe), cliName(in.OS))}
 		switch in.Kind {
 		case KindAppImage:
 			if err := os.Chmod(tmp.Name(), 0o755); err != nil {
@@ -421,12 +423,12 @@ func (u *Updater) install(ctx context.Context, rel *Release, asset string, actio
 			}
 			files, keep = []placement{{tmp.Name(), in.AppImage}}, true
 		case KindWeb:
-			files, err = extract(tmp.Name(), isZip(asset), map[string]string{backendName(in.OS): in.Exe})
+			files, err = extract(tmp.Name(), isZip(asset), map[string]string{backendName(in.OS): in.Exe}, cli)
 		case KindPortable:
 			files, err = extract(tmp.Name(), isZip(asset), map[string]string{
 				backendName(in.OS): in.Exe,
 				shellName(in.OS):   filepath.Join(dir, shellName(in.OS)),
-			})
+			}, cli)
 		default:
 			err = fmt.Errorf("cannot replace a %s installation", in.Kind)
 		}

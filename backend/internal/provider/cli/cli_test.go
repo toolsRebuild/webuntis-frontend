@@ -92,7 +92,7 @@ func TestExitCodes(t *testing.T) {
 func TestMissingBinaryIsAConfigError(t *testing.T) {
 	r := &fakeRunner{err: &fs.PathError{Op: "fork/exec", Path: "/nope", Err: fs.ErrNotExist}}
 	_, err := New(Config{Binary: "/nope"}, r).Snapshot(context.Background(), window)
-	if provider.KindOf(err) != provider.KindConfig || !strings.Contains(err.Error(), "pipx") {
+	if provider.KindOf(err) != provider.KindConfig || !strings.Contains(err.Error(), "webuntis-scraper/releases") {
 		t.Errorf("err = %v (%v)", err, provider.KindOf(err))
 	}
 }

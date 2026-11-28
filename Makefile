@@ -2,7 +2,7 @@
 #   make dev       run backend (sample data) + frontend in the browser
 #   make app       run the full Tauri desktop app
 #   make test      run all tests
-#   make build     build the backend sidecar and the desktop bundle
+#   make build     build the sidecars (untisd, untis CLI) and the desktop bundle
 
 BACKEND   := backend
 DESKTOP   := desktop
@@ -38,6 +38,7 @@ lint: backend-test
 sidecar:
 	mkdir -p $(dir $(SIDECAR))
 	cd $(BACKEND) && go build -trimpath -ldflags "$(GOFLAGS_LD)" -o ../$(SIDECAR) ./cmd/untisd
+	bash scripts/release.sh cli-sidecar $(TRIPLE)
 
 # Browser development: run backend-dev and dev in two terminals.
 backend-dev:

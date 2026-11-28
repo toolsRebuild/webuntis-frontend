@@ -29,3 +29,6 @@ sessions/
 
 # Release artefacts
 /release/
+
+# Downloaded untis CLI archives (scripts/release.sh)
+/.cache/

@@ -47,22 +47,53 @@ while IFS=/ read -r goos goarch goarm; do
 done < <($R targets)
 echo "ok   install guide covers the web targets"
 
+# A fake webuntis-scraper release of the pinned CLI version, so the
+# tests neither download anything nor depend on a real release.
+CLI=$(tr -d '[:space:]' <UNTIS_CLI_VERSION)
+[[ $CLI =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && echo "ok   UNTIS_CLI_VERSION pins a version" || { echo "FAIL UNTIS_CLI_VERSION: '$CLI'"; fail=1; }
+clidir=$(mktemp -d)
+fake_cli() { # fake_cli GOOS SUFFIX
+  local name=untis-$CLI-$1-$2 stage bin=untis
+  [[ $1 == windows ]] && bin=untis.exe
+  stage=$(mktemp -d)
+  mkdir -p "$stage/$name"
+  printf '#!/bin/sh\necho "untis %s (fake %s-%s)"\n' "$CLI" "$1" "$2" >"$stage/$name/$bin"
+  chmod 755 "$stage/$name/$bin"
+  echo docs >"$stage/$name/README.txt"
+  if [[ $1 == windows ]]; then (cd "$stage" && zip -qr "$clidir/$name.zip" "$name")
+  else tar -C "$stage" -czf "$clidir/$name.tar.gz" "$name"; fi
+  rm -rf "$stage"
+}
+for t in linux-amd64 freebsd-amd64 windows-arm64 linux-armv7 "$(go env GOOS)-$(go env GOARCH)"; do fake_cli "${t%%-*}" "${t#*-}"; done
+(cd "$clidir" && sha256sum * >SHA256SUMS)
+export UNTIS_CLI_DIR=$clidir
+
 # Build a sidecar and two web archives for real.
 out=$($R sidecar x86_64-unknown-linux-gnu)
-check "sidecar version" "untisd $(cat VERSION)" "$("$out" -version)"
+check "sidecar version" "untisd $(cat VERSION)" "$("$(head -1 <<<"$out")" -version)"
+check "cli sidecar" "untis $CLI (fake linux-amd64)" "$(desktop/src-tauri/binaries/untis-x86_64-unknown-linux-gnu)"
+
+# A tampered CLI archive is refused.
+bad=$(mktemp -d)
+cp "$clidir"/* "$bad/"
+echo tampered >>"$bad/untis-$CLI-linux-amd64.tar.gz"
+if UNTIS_CLI_DIR=$bad $R cli linux amd64 "" "$bad/out" >/dev/null 2>&1; then echo "FAIL tampered CLI accepted"; fail=1; else echo "ok   tampered CLI rejected"; fi
+if UNTIS_CLI_DIR=$bad $R cli linux s390x "" "$bad/out" >/dev/null 2>&1; then echo "FAIL missing CLI accepted"; fail=1; else echo "ok   missing CLI archive fails"; fi
+rm -rf "$bad"
 
 dist=backend/internal/webui/dist
 created_index=0
 if [[ ! -f $dist/index.html ]]; then echo '<html><head></head></html>' >$dist/index.html; created_index=1; fi
-trap '[[ $created_index == 1 ]] && rm -f '"$dist"'/index.html; rm -rf release' EXIT
+trap '[[ $created_index == 1 ]] && rm -f '"$dist"'/index.html; rm -rf release "$clidir"' EXIT
 rm -rf release
 
 tgz=$($R web freebsd amd64)
 check "freebsd archive" "untis-web-$(cat VERSION)-freebsd-amd64.tar.gz" "$(basename "$tgz")"
-check "freebsd contents" "README.txt untisd" "$(tar -tzf "$tgz" | grep -v '/$' | xargs -n1 basename | sort | xargs)"
+check "freebsd contents" "README.txt untis untisd" "$(tar -tzf "$tgz" | grep -v '/$' | xargs -n1 basename | sort | xargs)"
 zipf=$($R web windows arm64)
 check "windows archive is zip" "untis-web-$(cat VERSION)-windows-arm64.zip" "$(basename "$zipf")"
 check "windows binary" "1" "$(unzip -l "$zipf" | grep -c 'untisd.exe')"
+check "windows cli" "1" "$(unzip -l "$zipf" | grep -c ' untis-web-[^ ]*/untis.exe')"
 armf=$($R web linux arm 7)
 check "armv7 name" "untis-web-$(cat VERSION)-linux-armv7.tar.gz" "$(basename "$armf")"
 
@@ -83,19 +114,21 @@ mkdir -p "$fake/x86_64-unknown-linux-gnu/release/bundle/"{deb,rpm,appimage}
 touch "$fake/x86_64-unknown-linux-gnu/release/bundle/deb/Untis_${V}_amd64.deb" \
       "$fake/x86_64-unknown-linux-gnu/release/bundle/rpm/Untis-${V}-1.x86_64.rpm" \
       "$fake/x86_64-unknown-linux-gnu/release/bundle/appimage/Untis_${V}_amd64.AppImage" \
-      "$fake/x86_64-unknown-linux-gnu/release/untis-desktop" "$fake/x86_64-unknown-linux-gnu/release/untisd"
+      "$fake/x86_64-unknown-linux-gnu/release/untis-desktop" "$fake/x86_64-unknown-linux-gnu/release/untisd" \
+      "$fake/x86_64-unknown-linux-gnu/release/untis"
 mkdir -p "$fake/universal-apple-darwin/release/bundle/"{dmg,macos/Untis.app/Contents}
 touch "$fake/universal-apple-darwin/release/bundle/dmg/Untis_${V}_universal.dmg"
 mkdir -p "$fake/aarch64-pc-windows-msvc/release/bundle/nsis"
 touch "$fake/aarch64-pc-windows-msvc/release/bundle/nsis/Untis_${V}_arm64-setup.exe" \
-      "$fake/aarch64-pc-windows-msvc/release/untis-desktop.exe" "$fake/aarch64-pc-windows-msvc/release/untisd.exe"
+      "$fake/aarch64-pc-windows-msvc/release/untis-desktop.exe" "$fake/aarch64-pc-windows-msvc/release/untisd.exe" \
+      "$fake/aarch64-pc-windows-msvc/release/untis.exe"
 rm -rf release
 TARGET_DIR=$fake $R collect x86_64-unknown-linux-gnu >/dev/null
 TARGET_DIR=$fake $R collect universal-apple-darwin >/dev/null
 TARGET_DIR=$fake $R collect aarch64-pc-windows-msvc >/dev/null
 check "collected files" "Untis-${V}-1.x86_64.rpm Untis_${V}_amd64.AppImage Untis_${V}_amd64.deb Untis_${V}_arm64-setup.exe Untis_${V}_arm64-windows-portable.zip Untis_${V}_universal.app.tar.gz Untis_${V}_universal.dmg Untis_${V}_x64-linux-portable.tar.gz" "$(ls release | sort | xargs)"
-check "linux portable contents" "portable.txt untis-desktop untisd" "$(tar -tzf release/Untis_${V}_x64-linux-portable.tar.gz | grep -v '/$' | xargs -n1 basename | sort | xargs)"
-check "windows portable contents" "2" "$(unzip -l release/Untis_${V}_arm64-windows-portable.zip | grep -c '\.exe')"
+check "linux portable contents" "portable.txt untis untis-desktop untisd" "$(tar -tzf release/Untis_${V}_x64-linux-portable.tar.gz | grep -v '/$' | xargs -n1 basename | sort | xargs)"
+check "windows portable contents" "3" "$(unzip -l release/Untis_${V}_arm64-windows-portable.zip | grep -c '\.exe')"
 check "windows portable marker" "1" "$(unzip -l release/Untis_${V}_arm64-windows-portable.zip | grep -c 'portable\.txt')"
 # The marker has the name the updater looks for.
 check "marker name in the updater" "1" "$(grep -c 'PortableMarker = "portable.txt"' backend/internal/update/install.go)"

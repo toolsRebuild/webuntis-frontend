@@ -4,6 +4,37 @@ All notable changes to this project. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions
 follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-11-28
+
+The `untis` CLI now comes with the app: no Python, pipx or Chromium to
+install before you can see your real timetable.
+
+### Added
+
+- Every release ships the `untis` CLI 1.1.0 (the Go version from
+  [webuntis-scraper](https://github.com/toolsRebuild/webuntis-scraper/releases/tag/v1.1.0))
+  next to the app: as a second sidecar in the desktop app, and in the
+  portable folders and every web edition archive. Its version is pinned in
+  `UNTIS_CLI_VERSION`; the release build downloads exactly that release
+  and checks it against its `SHA256SUMS`.
+- With the default executable `untis`, the app runs the bundled CLI and
+  only falls back to the one in your `PATH` when there is none. A path in
+  **Settings › Data source › Executable** still wins.
+- The update button replaces the bundled CLI together with the app.
+
+### Changed
+
+- The release workflow publishes the release right away instead of
+  leaving a draft.
+- The "untis CLI not found" message points to the webuntis-scraper
+  downloads instead of `pipx`.
+
+### Known limits
+
+- The bundled Go CLI logs in over plain HTTP only. Accounts that need the
+  browser login (2FA, SSO) keep using the Python CLI: set its path in
+  **Settings › Data source › Executable**.
+
 ## [1.1.1] - 2026-11-27
 
 The first release that reaches 1.1.0 through the update button: press
@@ -84,6 +115,7 @@ First release.
   including two-key sequences.
 - 127 settings in 20 sections, with search, import, export and reset.
 
+[1.2.0]: https://github.com/toolsRebuild/webuntis-frontend/releases/tag/v1.2.0
 [1.1.1]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.1.1
 [1.1.0]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.1.0
 [1.0.0]: https://github.com/seesee010/webuntis-frontend/releases/tag/v1.0.0

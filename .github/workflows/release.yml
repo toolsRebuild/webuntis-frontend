@@ -1,6 +1,6 @@
 name: Release
 
-# Tags v* build everything and publish a draft GitHub release.
+# Tags v* build everything and publish a GitHub release.
 # Pull requests that touch the release machinery run the same builds as a
 # dry run (nothing is published), so a broken release never reaches a tag.
 on:
@@ -121,7 +121,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish draft release
+    name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [web, desktop]
     runs-on: ubuntu-latest
@@ -136,7 +136,7 @@ jobs:
       - run: scripts/release.sh checksums
       - name: Release notes from the changelog
         run: scripts/release.sh notes "${GITHUB_REF_NAME#v}" > notes.md
-      - name: Create the draft release
+      - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release/* --draft --title "Untis $GITHUB_REF_NAME" --notes-file notes.md
+        run: gh release create "$GITHUB_REF_NAME" release/* --title "Untis $GITHUB_REF_NAME" --notes-file notes.md

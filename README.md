@@ -6,7 +6,7 @@
 
 **Your WebUntis timetable as a fast, modular desktop app.**
 
-Built on top of the [`untis`](https://github.com/seesee010/webuntis-scraper) command line tool,
+Built on top of the [`untis`](https://github.com/toolsRebuild/webuntis-scraper) command line tool (shipped with the app),
 with far more knobs than the WebUntis web interface.
 
 ![Made With:Agentic_Engineering](https://img.shields.io/badge/made%20with-Agentic_Engineering-red?style=plastic)
@@ -105,12 +105,18 @@ make dev           # Vite on http://localhost:1420
 
 ## 🔑 Using your real timetable
 
-1. Install and set up the CLI once:
+1. Set up the CLI once. Every release ships the `untis` CLI next to the
+   app ([where to find it](docs/install.md#the-bundled-untis-cli)), so you
+   only run:
 
    ```bash
-   pipx install git+https://github.com/seesee010/webuntis-scraper
    untis init
    ```
+
+   Built from source, install the CLI yourself: download it from the
+   [webuntis-scraper releases](https://github.com/toolsRebuild/webuntis-scraper/releases/latest)
+   (or `pipx install git+https://github.com/toolsRebuild/webuntis-scraper`
+   for the Python version).
 
 2. In the app, open **Settings › Data source** and switch the source to
    **untis CLI**. The executable, transport, cache age (`--max-age`),
@@ -169,6 +175,12 @@ make test      # Go, TypeScript and Rust tests
 make lint      # go vet + tsc
 make build     # release bundle
 ```
+
+`make sidecar` (used by `make app`, `make build` and the shell tests)
+downloads the `untis` CLI version pinned in `UNTIS_CLI_VERSION` from the
+webuntis-scraper releases, checks it against their `SHA256SUMS` and puts it
+next to the `untisd` sidecar. To bundle another CLI version, change that
+file.
 
 Every change comes with tests, and CI must be green before a pull request
 is merged. Tests only use made-up data and never run the real `untis` CLI.
